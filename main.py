@@ -1,9 +1,6 @@
 import tkinter as tk
 import sys
 import os
-
-from services.Library_Service import *
-from services.School_Service import *
 from ui.Student_ui import *
 from ui.Subject_ui import *
 from ui.ClassRoom_ui import *
@@ -224,3 +221,4 @@ def main_menu():
 if __name__ == '__main__':
     main_menu()
     root.mainloop()
+
