@@ -1,12 +1,27 @@
+from database.db import init_db
 import tkinter as tk
+from tkinter import messagebox
 import sys
 import os
+from datetime import datetime
 from ui.Student_ui import *
 from ui.Subject_ui import *
 from ui.ClassRoom_ui import *
 from ui.SchoolEmployee_ui import *
 from ui.lib_item_ui import *
 from ui.member_ui import *
+
+# ================== LOG CONFIG ==================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.join(BASE_DIR, "log")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+LOG_FILE = os.path.join(LOG_DIR, "School_Manager_System_log.txt")
+
+def write_log(message: str):
+    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{time}] {message}\n")
 
 # ================== Helper ==================
 def resource_path(relative_path):
@@ -16,11 +31,20 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-
+# ================== ROOT ==================
 root = tk.Tk()
 root.title("School Manager System")
 root.state("zoomed")
 root.configure(bg="#e5e7eb")
+
+# ================== EXIT HANDLER ==================
+def exit_app():
+    if messagebox.askokcancel("Exit", "Are you sure you want to exit the program?"):
+        write_log("Application Closed")
+        root.destroy()
+
+# وقتی روی ضربدر (X) کلیک شود
+root.protocol("WM_DELETE_WINDOW", exit_app)
 
 # ================== Main Layout ==================
 container = tk.Frame(root, bg="#e5e7eb")
@@ -36,8 +60,8 @@ if os.path.exists(bg_image_path):
     bg_label = tk.Label(left_frame, image=bg_image, bg="#e5e7eb")
     bg_label.place(relx=0.5, rely=0.5, anchor="center")
 else:
-    tk.Label(left_frame, text="Background Image Not Found", font=("Arial", 20), bg="#e5e7eb").pack(expand=True)
-
+    tk.Label(left_frame, text="Background Image Not Found",
+             font=("Arial", 20), bg="#e5e7eb").pack(expand=True)
 
 # ---------- Right (Menu) ----------
 menu_frame = tk.Frame(container, bg="#0f172a", width=420)
@@ -48,7 +72,6 @@ menu_frame.pack_propagate(False)
 def clear_menu():
     for w in menu_frame.winfo_children():
         w.destroy()
-
 
 def menu_btn(text, cmd):
     btn = tk.Button(
@@ -64,7 +87,6 @@ def menu_btn(text, cmd):
         height=2,
         cursor="hand2"
     )
-    # Hover Effect
     def on_enter(e):
         btn['bg'] = 'white'
         btn['fg'] = 'black'
@@ -108,8 +130,7 @@ def back_btn(cmd):
     btn.pack(fill="x", padx=30, pady=20)
 
 # ================== Menu Functions ==================
-
-# ----- Library -----
+# Library
 def Items_Management():
     clear_menu()
     title("Items Management")
@@ -137,18 +158,18 @@ def Library_Management():
     menu_btn("Register", Register_Management).pack(fill="x", padx=30, pady=6)
     back_btn(main_menu)
 
-
+# Student
 def Student_Management_m():
     clear_menu()
     title("Student Management")
-    menu_btn("Add", Add_s).pack(fill="x", padx=30, pady=5)
+    menu_btn("Add", add_student).pack(fill="x", padx=30, pady=5)
     menu_btn("Remove", remove_student).pack(fill="x", padx=30, pady=5)
     menu_btn("Search", search_student).pack(fill="x", padx=30, pady=5)
     menu_btn("Edit", edit_student).pack(fill="x", padx=30, pady=5)
-    menu_btn("Show All", Show_all_students).pack(fill="x", padx=30, pady=5)
+    menu_btn("Show All", show_all_students).pack(fill="x", padx=30, pady=5)
     back_btn(main_menu)
 
-
+# Subject
 def Subject_Management():
     clear_menu()
     title("Subject Management")
@@ -159,7 +180,7 @@ def Subject_Management():
     menu_btn("Show All", show_all_subjects).pack(fill="x", padx=30, pady=5)
     back_btn(main_menu)
 
-
+# Classroom
 def ClassRoom_Management():
     clear_menu()
     title("Classroom Management")
@@ -170,7 +191,7 @@ def ClassRoom_Management():
     menu_btn("Show All", show_all_classrooms).pack(fill="x", padx=30, pady=5)
     back_btn(main_menu)
 
-
+# School Employee
 def SchoolEmployee_Management():
     clear_menu()
     title("School Employee Management")
@@ -180,10 +201,6 @@ def SchoolEmployee_Management():
     menu_btn("Edit", edit_employee).pack(fill="x", padx=30, pady=5)
     menu_btn("Show All", show_all_employees).pack(fill="x", padx=30, pady=5)
     back_btn(main_menu)
-
-
-def exit_app():
-    root.destroy()
 
 # ================== Main Menu ==================
 def main_menu():
@@ -219,6 +236,7 @@ def main_menu():
 
 # ================== Start ==================
 if __name__ == '__main__':
+    init_db()
+    write_log("Application Started")
     main_menu()
     root.mainloop()
-
