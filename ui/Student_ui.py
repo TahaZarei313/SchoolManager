@@ -1,18 +1,21 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from models.Student import Student
+from models.ClassRoom import ClassRoom  
 
-def Add_s():
+# ================= ADD =================
+def add_student():
     win = tk.Toplevel()
     win.title("Add Student")
-    win.geometry("420x500")
-    win.grab_set()  # Modal
+    win.geometry("400x550")
+    win.grab_set()
 
-    tk.Label(win, text="Add New Student", font=("Arial", 16)).pack(pady=10)
+    tk.Label(win, text="Add Student", font=("Arial", 16)).pack(pady=10)
 
     form = tk.Frame(win)
     form.pack(pady=10)
 
+    # ---- فرم اطلاعات ----
     tk.Label(form, text="Name").pack()
     entry_name = tk.Entry(form)
     entry_name.pack()
@@ -42,10 +45,23 @@ def Add_s():
     combo_grade = ttk.Combobox(form, textvariable=grade_var, values=["7", "8", "9"], state="readonly")
     combo_grade.pack()
 
-    def save_student():
+   
+    tk.Label(form, text="Classroom").pack()
+    classrooms = ClassRoom.get_class_list()  
+    if not classrooms:
+        class_dict = {"No Class (ID: 0)": 0}
+    else:
+        class_dict = {f"{c['class_name']} (ID: {c['class_id']})": c['class_id'] for c in classrooms}
+
+    class_var = tk.StringVar(value=list(class_dict.keys())[0])
+    combo_class = ttk.Combobox(form, textvariable=class_var, values=list(class_dict.keys()), state="readonly")
+    combo_class.pack()
+
+   
+    def save():
         try:
             Student(
-                classroom_id="Unknown",
+                classroom_id=class_dict[class_var.get()],
                 name=entry_name.get(),
                 lname=entry_lname.get(),
                 ncode=entry_ncode.get(),
@@ -59,11 +75,12 @@ def Add_s():
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=win)
 
-    tk.Button(win, text="Save Student", width=25, command=save_student).pack(pady=5)
+    tk.Button(win, text="Save", width=25, command=save).pack(pady=5)
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
-def Show_all_students():
+# ================= SHOW ALL =================
+def show_all_students():
     win = tk.Toplevel()
     win.title("All Students")
     win.geometry("600x400")
@@ -72,15 +89,15 @@ def Show_all_students():
     tk.Label(win, text="All Students", font=("Arial", 16)).pack(pady=10)
 
     listbox = tk.Listbox(win, width=100)
-    listbox.pack(padx=10, pady=10, fill="both", expand=True)
+    listbox.pack(fill="both", expand=True, padx=10, pady=10)
 
-    all_students = Student.show_all()
-    for s in all_students:
-        listbox.insert(tk.END, s)
+    for info in Student.show_all():
+        listbox.insert(tk.END, info)
 
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=10)
 
 
+# ================= SEARCH =================
 def search_student():
     win = tk.Toplevel()
     win.title("Search Student")
@@ -88,39 +105,42 @@ def search_student():
     win.grab_set()
 
     tk.Label(win, text="Search Student", font=("Arial", 16)).pack(pady=10)
-
     tk.Label(win, text="Student ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
-    result_label = tk.Label(win, text="", justify="left")
-    result_label.pack(pady=10)
+    result = tk.Label(win, text="", justify="left")
+    result.pack(pady=10)
 
-    def do_search():
+    def search():
         try:
-            student_id = int(entry_id.get())
-            student = Student.search_by_id(student_id)
+            sid = int(entry_id.get())
+            student = Student.search_by_id(sid)
             if student is None:
                 messagebox.showerror("Error", "Student not found", parent=win)
-                result_label.configure(text="")
+                result.config(text="")
             else:
-                result_label.config(
+                result.config(
                     text=
                     f"ID: {student.student_id}\n"
                     f"Name: {student.name}\n"
                     f"Last Name: {student.lname}\n"
-                    f"Grade: {student.grade}\n"
+                    f"National Code: {student.ncode}\n"
                     f"Age: {student.age}\n"
                     f"Phone: {student.phone}\n"
-                    f"Address: {student.address}"
+                    f"Address: {student.address}\n"
+                    f"Grade: {student.grade}\n"
+                    f"Classroom: {student.classroom_id}"
                 )
         except ValueError:
-            messagebox.showerror("Error", "Student ID must be a number", parent=win)
+            messagebox.showerror("Error", "Invalid ID", parent=win)
 
-    tk.Button(win, text="Search", width=25, command=do_search).pack(pady=5)
+    tk.Button(win, text="Search", width=25, command=search).pack(pady=5)
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
+# ================= REMOVE =================
 def remove_student():
     win = tk.Toplevel()
     win.title("Remove Student")
@@ -128,54 +148,54 @@ def remove_student():
     win.grab_set()
 
     tk.Label(win, text="Remove Student", font=("Arial", 16)).pack(pady=10)
-
     tk.Label(win, text="Student ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
-    def do_remove():
+    def remove():
         try:
-            student_id = int(entry_id.get())
-            student = Student.search_by_id(student_id)
-            if student is None:
-                messagebox.showerror("Error", "Student not found", parent=win)
-            else:
+            sid = int(entry_id.get())
+            student = Student.search_by_id(sid)
+            if student:
                 student.remove()
                 messagebox.showinfo("Success", "Student removed successfully", parent=win)
                 win.destroy()
+            else:
+                messagebox.showerror("Error", "Student not found", parent=win)
         except ValueError:
-            messagebox.showerror("Error", "Student ID must be a number", parent=win)
+            messagebox.showerror("Error", "Invalid ID", parent=win)
 
-    tk.Button(win, text="Remove", width=25, command=do_remove).pack(pady=5)
-    tk.Button(win, text="Close", width=25, command=win.destroy).pack()
+    tk.Button(win, text="Remove", width=25, command=remove).pack(pady=5)
+    tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
+# ================= EDIT =================
 def edit_student():
     win = tk.Toplevel()
-    win.title('Edit Student')
-    win.geometry("400x250")
+    win.title("Edit Student")
+    win.geometry("400x300")
     win.grab_set()
 
     tk.Label(win, text="Edit Student", font=("Arial", 16)).pack(pady=10)
     tk.Label(win, text="Student ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
-    result_label = tk.Label(win, text="")
-    result_label.pack(pady=10)
-
     def search_and_edit():
         try:
-            student_id = int(entry_id.get())
-            student = Student.search_by_id(student_id)
+            sid = int(entry_id.get())
+            student = Student.search_by_id(sid)
             if student is None:
                 messagebox.showerror("Error", "Student not found", parent=win)
                 return
 
-            win.geometry("400x600")
+            win.geometry("400x650")
             form = tk.Frame(win)
             form.pack(pady=10)
 
+            
             tk.Label(form, text="Name").pack()
             entry_name = tk.Entry(form)
             entry_name.pack()
@@ -211,7 +231,21 @@ def edit_student():
             combo_grade = ttk.Combobox(form, textvariable=grade_var, values=["7", "8", "9"], state="readonly")
             combo_grade.pack()
 
-            def do_edit():
+            
+            tk.Label(form, text="Classroom").pack()
+            classrooms = ClassRoom.get_class_list()
+            if not classrooms:
+                class_dict = {"No Class (ID: 0)": 0}
+            else:
+                class_dict = {f"{c['class_name']} (ID: {c['class_id']})": c['class_id'] for c in classrooms}
+
+        
+            default_class = [k for k, v in class_dict.items() if v == student.classroom_id]
+            class_var = tk.StringVar(value=default_class[0] if default_class else list(class_dict.keys())[0])
+            combo_class = ttk.Combobox(form, textvariable=class_var, values=list(class_dict.keys()), state="readonly")
+            combo_class.pack()
+
+            def save_edit():
                 try:
                     student.edit(
                         n_name=entry_name.get(),
@@ -220,17 +254,18 @@ def edit_student():
                         n_age=int(entry_age.get()),
                         n_phone=entry_phone.get(),
                         n_address=entry_address.get(),
-                        n_grade=int(grade_var.get())
+                        n_grade=int(grade_var.get()),
+                        n_classroom_id=class_dict[class_var.get()]
                     )
-                    messagebox.showinfo("Success", "Student edited successfully", parent=win)
+                    messagebox.showinfo("Success", "Student updated successfully", parent=win)
                     win.destroy()
                 except Exception as e:
                     messagebox.showerror("Error", str(e), parent=win)
 
-            tk.Button(form, text="Edit", width=25, command=do_edit).pack(pady=5)
+            tk.Button(form, text="Save Changes", width=25, command=save_edit).pack(pady=10)
 
         except ValueError:
-            messagebox.showerror("Error", "Student ID must be a number", parent=win)
+            messagebox.showerror("Error", "ID must be a number", parent=win)
 
     tk.Button(win, text="Search", width=25, command=search_and_edit).pack(pady=5)
-    tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
+    tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=10)
