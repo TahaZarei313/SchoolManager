@@ -28,7 +28,7 @@ def add_item(root=None):
             widget.destroy()
         fields.clear()
 
-        # فیلدهای مشترک
+        
         for label_text in ["Name", "Price", "Category", "Year"]:
             tk.Label(form_frame, text=label_text).pack()
             if label_text == "Category":
@@ -38,7 +38,7 @@ def add_item(root=None):
             entry.pack()
             fields[label_text] = entry
 
-        # فیلدهای اختصاصی
+        
         if item_type == "Book":
             for label_text in ["Author", "ISBN", "Num Page"]:
                 tk.Label(form_frame, text=label_text).pack()
@@ -71,17 +71,20 @@ def add_item(root=None):
             }
 
             if item_type == "Book":
-                Book(**common_args,
-                     author=fields["Author"].get(),
-                     isbn=fields["ISBN"].get(),
-                     num_page=int(fields["Num Page"].get()))
+                item = Book(**common_args,
+                            author=fields["Author"].get(),
+                            isbn=fields["ISBN"].get(),
+                            num_page=int(fields["Num Page"].get()))
+                item.add()  
             elif item_type == "Magazine":
-                Magazine(**common_args,
-                         num_page=int(fields["Num Page"].get()))
+                item = Magazine(**common_args,
+                                num_page=int(fields["Num Page"].get()))
+                item.add()
             elif item_type == "DVD":
-                DVD(**common_args,
-                    duration=int(fields["Duration"].get()),
-                    num_file=int(fields["Num File"].get()))
+                item = DVD(**common_args,
+                           duration=int(fields["Duration"].get()),
+                           num_file=int(fields["Num File"].get()))
+                item.add()
 
             messagebox.showinfo("Success", f"{item_type} added successfully")
             win.destroy()
@@ -116,13 +119,12 @@ def edit_item(root=None):
             if not item:
                 messagebox.showerror("Error", f"Item with ID {item_id} not found")
                 return
-
-            # پاک کردن فرم قبلی
+                
             for widget in form_frame.winfo_children():
                 widget.destroy()
             fields.clear()
 
-            # فیلدهای مشترک
+            
             category_var.set(getattr(item, "category", CATEGORY_OPTIONS[0]))
             for label_text in ["Name", "Price", "Category", "Year"]:
                 tk.Label(form_frame, text=label_text).pack()
@@ -134,7 +136,7 @@ def edit_item(root=None):
                 entry.pack()
                 fields[label_text] = entry
 
-            # فیلدهای اختصاصی
+            
             if isinstance(item, Book):
                 for label_text, attr in [("Author", "author"), ("ISBN", "isbn"), ("Num Page", "num_page")]:
                     tk.Label(form_frame, text=label_text).pack()
@@ -156,14 +158,14 @@ def edit_item(root=None):
                     entry.pack()
                     fields[label_text] = entry
 
-            # دکمه ذخیره
+        
             def do_edit():
                 try:
-                    # فیلدهای مشترک
+                    
                     common_args = {
                         "n_name": fields["Name"].get(),
                         "n_price": float(fields["Price"].get()),
-                        "n_category": category_var.get(),  # حتما از category_var استفاده کن
+                        "n_category": category_var.get(), 
                         "n_year": int(fields["Year"].get())
                     }
 
