@@ -1,122 +1,133 @@
-from models.Person import *
 from datetime import datetime
-
 import os
+import sqlite3
+from database.db import get_connection
+from models.Person import Person
+
+# ---------- LOG ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "..", "log")
-
-
 os.makedirs(LOG_DIR, exist_ok=True)
-
 LOG_FILE = os.path.join(LOG_DIR, "School_Manager_System_log.txt")
+
 def write_log(message: str):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{time}] {message}\n")
 
 
+# ---------- CLASS MEMBER ----------
 class Member(Person):
-    Member_list = []
 
-    def __init__(self, name, lname, ncode, age, phone, address, membership_num, username=None, password=None):
+    def __init__(self, name, lname, ncode, age, phone, address, membership_num, username=None, password=None, add_to_db=True):
         super().__init__(name, lname, ncode, age, phone, address)
         self.membership_num = membership_num
-        self.__username = username
-        self.__password = password
-        self.add()
+        self.username = username
+        self.password = password
+        if add_to_db:
+            self.add()
 
+    # ---------- CRUD ----------
     def add(self):
-        Member.Member_list.append(self)
-        print("Member added")
-        write_log(f"Member ===> Added (membership_num : {self.membership_num})")
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO members (name, lname, ncode, age, phone, address, membership_num, username, password)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (self.name, self.lname, self.ncode, self.age, self.phone, self.address,
+                  self.membership_num, self.username, self.password))
+            conn.commit()
+            conn.close()
+            write_log(f"Member ===> Added (membership_num: {self.membership_num})")
+        except Exception as e:
+            write_log(f"Member ===> Add FAILED (membership_num: {self.membership_num}) - {e}")
+            raise e
 
     def remove(self):
-        Member.Member_list.remove(self)
-        print("Member removed")
-        write_log(f"Member ===> Removed (membership_num : {self.membership_num})")
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM members WHERE membership_num=?", (self.membership_num,))
+            conn.commit()
+            conn.close()
+            write_log(f"Member ===> Removed (membership_num: {self.membership_num})")
+        except Exception as e:
+            write_log(f"Member ===> Remove FAILED (membership_num: {self.membership_num}) - {e}")
+            raise e
 
-    @classmethod
-    def member_count(cls):
-        print(f"Member count is: {len(cls.Member_list)}")
-        write_log(f"Member ===> Count requested (total : {len(cls.Member_list)})")
+    def edit(self, n_name=None, n_lname=None, n_ncode=None, n_age=None, n_phone=None, n_address=None,
+             n_membership_num=None, n_username=None, n_password=None):
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            updates = []
+            params = []
 
-    def show(self):
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- Member Info -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        print("Member name:", self.name)
-        print("Member last name:", self.lname)
-        print("Member National code:", self.ncode)
-        print("Member Age:", self.age)
-        print("Member Phone:", self.phone)
-        print("Member Address:", self.address)
-        print("Membership number:", self.membership_num)
-        print("Username:", self.__username)
-        print("Password:", self.__password)
-        write_log(f"Member ===> Info requested (membership_num : {self.membership_num})")
+            old_membership = self.membership_num  # برای شرط WHERE
 
-    def edit(self, n_name=None, n_lname=None, n_phone=None, n_address=None, n_membership_num=None, n_username=None, n_password=None):
-        if n_name is not None:
-            self.name = n_name
-        if n_lname is not None:
-            self.lname = n_lname
-        if n_phone is not None:
-            self.phone = n_phone
-        if n_address is not None:
-            self.address = n_address
-        if n_membership_num is not None:
-            self.membership_num = n_membership_num
-        if n_username is not None:
-            self.__username = n_username
-        if n_password is not None:
-            self.__password = n_password
-        print("Member edited")
-        write_log(f"Member ===> Edited (membership_num : {self.membership_num})")
+            if n_name is not None:
+                updates.append("name=?"); params.append(n_name); self.name = n_name
+            if n_lname is not None:
+                updates.append("lname=?"); params.append(n_lname); self.lname = n_lname
+            if n_ncode is not None:
+                updates.append("ncode=?"); params.append(n_ncode); self.ncode = n_ncode
+            if n_age is not None:
+                updates.append("age=?"); params.append(n_age); self.age = n_age
+            if n_phone is not None:
+                updates.append("phone=?"); params.append(n_phone); self.phone = n_phone
+            if n_address is not None:
+                updates.append("address=?"); params.append(n_address); self.address = n_address
+            if n_membership_num is not None:
+                updates.append("membership_num=?"); params.append(n_membership_num); self.membership_num = n_membership_num
+            if n_username is not None:
+                updates.append("username=?"); params.append(n_username); self.username = n_username
+            if n_password is not None:
+                updates.append("password=?"); params.append(n_password); self.password = n_password
 
+            if updates:
+                params.append(old_membership)
+                cursor.execute(f"UPDATE members SET {', '.join(updates)} WHERE membership_num=?", params)
+                conn.commit()
+
+            conn.close()
+            write_log(f"Member ===> Edited (membership_num: {self.membership_num})")
+        except Exception as e:
+            write_log(f"Member ===> Edit FAILED (membership_num: {self.membership_num}) - {e}")
+            raise e
+
+    # ---------- CLASS METHODS ----------
     @classmethod
     def search_by_membership_num(cls, membership_num):
-        for i in cls.Member_list:
-            if i.membership_num == membership_num:
-                s = f"Found ==> membership number: {i.membership_num} - name: {i.name} - last name: {i.lname} - national code: {i.ncode}"
-                write_log(f"Member ===> Search success (membership_num : {membership_num})")
-                print(s)
-                return i
-        print("Not found")
-        write_log(f"Member ===> Search failed (membership_num : {membership_num})")
-        return None
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT name, lname, ncode, age, phone, address, membership_num, username, password
+            FROM members WHERE membership_num=?
+        """, (membership_num,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            member = Member(*row[:6], membership_num=row[6], username=row[7], password=row[8], add_to_db=False)
+            write_log(f"Member ===> Search success (membership_num: {membership_num})")
+            return member
+        else:
+            write_log(f"Member ===> Search failed (membership_num: {membership_num})")
+            return None
 
     @classmethod
     def show_all(cls):
-        member_info = []
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- All Member -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        write_log("Library Member ===> Show all items requested")
-        for i in cls.Member_list:
-            info = f"Found ==> membership number: {i.membership_num} - name: {i.name} - last name: {i.lname} - national code: {i.ncode}"
-            member_info.append(info)
-            print(info)
-        return member_info
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, lname, ncode, age, phone, address, membership_num, username, password FROM members")
+        rows = cursor.fetchall()
+        conn.close()
 
-# ================== TEST CASES ==================
-if __name__ == "__main__":
-    print("\n--- Test 1: Create Members ---")
-    m1 = Member("Ali", "Zarei", "1234567890", 30, "09120000001", "Tehran", "ali123", "pass1")
-    m2 = Member("Sara", "Moradi", "1234567891", 25, "09120000002", "Tehran", "sara_m", "pass2")
-    m3 = Member("Reza", "Ahmadi", "1234567892", 28, "09120000003", "Tehran", "reza_a", "pass3")
+        members_info = []
+        for row in rows:
+            info = f"membership_num: {row[6]}, Name: {row[0]} {row[1]}, National Code: {row[2]}"
+            members_info.append(info)
 
-    print("\n--- Test 2: Show Individual Members ---")
-    m1.show()
-    m2.show()
-    m3.show()
-
-    print("\n--- Test 3: Total Members ---")
-    Member.member_count()
-
-    print("\n--- Test 4: Edit Member Information ---")
-    m2.edit(n_name="Sarina", n_phone="09121111111", n_username="sarina_m", n_password="newpass")
-    m2.show()
-
-    print("\n--- Test 5: Search by Membership Number ---")
-    Member.search_by_membership_num(m2.membership_num)
-    Member.search_by_membership_num("9999")  # شماره موجود نیست
-
-    print("\n--- Test 6: Remove a Member ---")
-    m3.remove()
-    Member.member_count()
+        write_log("Member ===> Show all items requested")
+        return members_info
