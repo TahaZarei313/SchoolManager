@@ -1,75 +1,52 @@
 from datetime import datetime
 import os
+from database.db import get_connection
+
+# ---------- LOG ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "..", "log")
-
-
 os.makedirs(LOG_DIR, exist_ok=True)
-
 LOG_FILE = os.path.join(LOG_DIR, "School_Manager_System_log.txt")
+
 def write_log(message: str):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{time}] {message}\n")
 
 
+# ---------- MODEL ----------
 class Subject:
-    subject_list = []
-    _id_counter = 456
 
-    def __init__(self, subject_name, subject_teacher, subject_grade, subject_category):
-        self.__subject_id = Subject._id_generator()
+    def __init__(self, subject_name, subject_teacher, subject_grade, subject_category, subject_id=None):
+        self.subject_id = subject_id
         self.subject_name = subject_name
         self.subject_teacher = subject_teacher
         self.subject_grade = subject_grade
         self.subject_category = subject_category
-        self.add()
 
-    @classmethod
-    def _id_generator(cls):
-        current_id = cls._id_counter
-        cls._id_counter += 4
-        return current_id
+        if self.subject_id is None:
+            self.add()
 
-    @property
-    def subject_id(self):
-        return self.__subject_id
-
+    # ---------- CRUD ----------
     def add(self):
-        Subject.subject_list.append(self)
-        print("Subject Added")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO subjects (subject_name, subject_teacher, subject_grade, subject_category)
+                VALUES (?, ?, ?, ?)
+            """, (self.subject_name, self.subject_teacher, self.subject_grade, self.subject_category))
+            self.subject_id = cursor.lastrowid
+            conn.commit()
+
         write_log(f"Subject ===> Added (id : {self.subject_id})")
 
     def remove(self):
-        Subject.subject_list.remove(self)
-        print("Subject Removed")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM subjects WHERE subject_id = ?", (self.subject_id,))
+            conn.commit()
+
         write_log(f"Subject ===> Removed (id : {self.subject_id})")
-
-    @classmethod
-    def subject_count(cls):
-        print(f"Subject Count is: {len(cls.subject_list)}")
-        write_log(f"Subject ===> Count requested (total : {len(cls.subject_list)})")
-
-    def show(self):
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- Subject Info -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        print(f"Subject ID: {self.__subject_id}")
-        print(f"Subject Name: {self.subject_name}")
-        print(f"Subject Teacher: {self.subject_teacher}")
-        print(f"Subject Grade: {self.subject_grade}")
-        print(f"Subject Category: {self.subject_category}")
-        write_log(f"Subject ===> Info requested (id : {self.subject_id})")
-
-    @classmethod
-    def search_by_id(cls, subject_id):
-        for i in cls.subject_list:
-            if i.subject_id == subject_id:
-                s = f"Found ==> ID: {i.subject_id} - Name: {i.subject_name} - Teacher: {i.subject_teacher} - Grade: {i.subject_grade} - Category: {i.subject_category}"
-                write_log(f"Subject ===> Search success (id : {subject_id})")
-                print(s)
-                return i
-        print("Not found")
-        write_log(f"Subject ===> Search failed (id : {subject_id})")
-        return None
 
     def edit(self, n_subject_name=None, n_subject_teacher=None, n_subject_grade=None, n_subject_category=None):
         if n_subject_name is not None:
@@ -80,43 +57,70 @@ class Subject:
             self.subject_grade = n_subject_grade
         if n_subject_category is not None:
             self.subject_category = n_subject_category
-        print("Subject Edited")
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE subjects
+                SET subject_name=?, subject_teacher=?, subject_grade=?, subject_category=?
+                WHERE subject_id=?
+            """, (self.subject_name, self.subject_teacher, self.subject_grade, self.subject_category, self.subject_id))
+            conn.commit()
+
         write_log(f"Subject ===> Edited (id : {self.subject_id})")
+
+    def show(self):
+        write_log(f"Subject ===> Info requested (id : {self.subject_id})")
+        return (
+            f"Subject ID: {self.subject_id}\n"
+            f"Name: {self.subject_name}\n"
+            f"Teacher: {self.subject_teacher}\n"
+            f"Grade: {self.subject_grade}\n"
+            f"Category: {self.subject_category}"
+        )
+
+    # ---------- CLASS METHODS ----------
+    @classmethod
+    def search_by_id(cls, subject_id):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM subjects WHERE subject_id = ?", (subject_id,))
+            row = cursor.fetchone()
+
+        if row:
+            write_log(f"Subject ===> Search success (id : {subject_id})")
+            return cls(subject_id=row[0], subject_name=row[1], subject_teacher=row[2], subject_grade=row[3], subject_category=row[4])
+
+        write_log(f"Subject ===> Search failed (id : {subject_id})")
+        return None
 
     @classmethod
     def show_all(cls):
-        subject_info = []
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- All Subjects -+-+-+-+-+-+-+-+-+-+-+-+-+-")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM subjects")
+            rows = cursor.fetchall()
+
         write_log("Subject ===> Show all requested")
-        for i in cls.subject_list:
-            info = f"ID: {i.subject_id} - Name: {i.subject_name} - Teacher: {i.subject_teacher} - Grade: {i.subject_grade} - Category: {i.subject_category}"
-            subject_info.append(info)
-            print(info)
-        return subject_info
+        return [
+            f"ID: {r[0]} - Name: {r[1]} - Teacher: {r[2]} - Grade: {r[3]} - Category: {r[4]}"
+            for r in rows
+        ]
 
-# ================== TEST CASES ==================
-if __name__ == "__main__":
-    print("\n--- Adding Subjects ---")
-    s1 = Subject("Math", "Mr. Ali", 9, "Science")
-    s2 = Subject("History", "Ms. Sara", 10, "Social")
-    s3 = Subject("Biology", "Dr. Reza", 9, "Science")
+    @classmethod
+    def get_subject_list(cls):
+        """لیست دروس به صورت دیکشنری برای UI"""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT subject_id, subject_name FROM subjects")
+            rows = cursor.fetchall()
+        return [{"subject_id": r[0], "subject_name": r[1]} for r in rows]
 
-    print("\n--- Show All Subjects ---")
-    Subject.show_all()
-
-    print("\n--- Search by ID ---")
-    Subject.search_by_id(s2.subject_id)
-    Subject.search_by_id(9999)
-    Subject.search_by_id(456)
-
-    print("\n--- Edit Subject ---")
-    s1.edit("Math", "Mr. Reza", 9, "Science")
-
-    print("\n--- Remove a Subject ---")
-    s3.remove()
-
-    print("\n--- Show All After Removal ---")
-    Subject.show_all()
-
-    print("\n--- Total Subjects ---")
-    Subject.subject_count()
+    @classmethod
+    def subject_count(cls):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM subjects")
+            count = cursor.fetchone()[0]
+        write_log(f"Subject ===> Count requested (total : {count})")
+        return count
