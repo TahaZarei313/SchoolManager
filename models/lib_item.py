@@ -1,35 +1,39 @@
+from database.db import get_connection
 from datetime import datetime
 import os
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, "..", "log")
-
-
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOG_FILE = os.path.join(LOG_DIR, "School_Manager_System_log.txt")
+
 def write_log(message: str):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{time}] {message}\n")
 
-class Item:
-    _id_counter = 2000
-    Item_list = []
 
-    def __init__(self, name, price, category, year):
-        self.__id = Item._id_generator()
+class Item:
+    Item_list = []  # فقط برای سازگاری – استفاده نمی‌شود
+
+    def __init__(self, name, price, category, year, item_type,
+                 author=None, isbn=None, num_page=None,
+                 duration=None, num_file=None):
+
+        self.__id = None
         self.name = name
-        self.__price = price
+        self.price = price
         self.category = category
         self.year = year
+        self.type = item_type
+        self.author = author
+        self.isbn = isbn
+        self.num_page = num_page
+        self.duration = duration
+        self.num_file = num_file
 
-        self.add()
 
-    @classmethod
-    def _id_generator(cls):
-        current_id = cls._id_counter
-        cls._id_counter += 5
-        return current_id
 
     @property
     def id(self):
@@ -46,177 +50,136 @@ class Item:
         self.__price = price
 
     def add(self):
-        Item.Item_list.append(self)
-        print("Item added")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO items 
+            (name, price, category, year, type, author, isbn, num_page, duration, num_file)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                self.name, self.price, self.category, self.year,
+                self.type, self.author, self.isbn,
+                self.num_page, self.duration, self.num_file
+            ))
+            self.__id = cursor.lastrowid
+            conn.commit()
+
         write_log(f"Library Item ===> Item added (id : {self.id})")
 
     def remove(self):
-        Item.Item_list.remove(self)
-        print("Item removed")
+        with get_connection() as conn:
+            conn.execute("DELETE FROM items WHERE id = ?", (self.id,))
+            conn.commit()
         write_log(f"Library Item ===> Item removed (id : {self.id})")
 
     @classmethod
-    def Item_count(cls):
-        print(f"Item count is: {len(Item.Item_list)}")
-        write_log(f"Library Item ===> Count requested (total : {len(Item.Item_list)})")
-
-    @classmethod
     def search_by_id(cls, id):
-        for i in cls.Item_list:
-            if i.id == id:
-                s = f"Found ==> ID: {i.id} - name: {i.name} - category: {i.category} - price: {i.price} - year: {i.year}"
-                write_log(f"Library Item ===> Search success (id : {i.id})")
-                print(s)
-                return i
-        print("Not found")
-        write_log(f"Library Item ===> Search failed (id : {id})")
-        return None
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM items WHERE id = ?", (id,))
+            row = cursor.fetchone()
 
-    def edit(self, n_name=None, n_price=None, n_category=None, n_year=None):
-        if n_name is not None:
-            self.name = n_name
-        if n_price is not None:
-            self.price = n_price
-        if n_category is not None:
-            self.category = n_category
-        if n_year is not None:
-            self.year = n_year
+        if not row:
+            write_log(f"Library Item ===> Search failed (id : {id})")
+            return None
+
+        return cls._row_to_object(row)
 
     @classmethod
     def show_all(cls):
-        item_info = []
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- All Items -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        write_log("Library Item ===> Show all items requested")
-        for i in cls.Item_list:
+        with get_connection() as conn:
+            rows = conn.execute("SELECT * FROM items").fetchall()
+
+        result = []
+        for row in rows:
+            i = cls._row_to_object(row)
             info = f"Found ==> ID: {i.id} - name: {i.name} - category: {i.category} - price: {i.price} - year: {i.year}"
-            item_info.append(info)
-            print(info)
-        return item_info
+            result.append(info)
+        write_log("Library Item ===> Show all items requested")
+        return result
+
+    @classmethod
+    def Item_count(cls):
+        with get_connection() as conn:
+            count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        write_log(f"Library Item ===> Count requested (total : {count})")
+        print(f"Item count is: {count}")
+
+    def edit(self, n_name=None, n_price=None, n_category=None, n_year=None,
+             n_author=None, n_isbn=None, n_page_num=None,
+             n_duration=None, n_num_file=None):
+
+        if n_name: self.name = n_name
+        if n_price is not None: self.price = n_price
+        if n_category: self.category = n_category
+        if n_year: self.year = n_year
+
+        if hasattr(self, "author") and n_author is not None:
+            self.author = n_author
+        if hasattr(self, "isbn") and n_isbn is not None:
+            self.isbn = n_isbn
+        if hasattr(self, "num_page") and n_page_num is not None:
+            self.num_page = n_page_num
+        if hasattr(self, "duration") and n_duration is not None:
+            self.duration = n_duration
+        if hasattr(self, "num_file") and n_num_file is not None:
+            self.num_file = n_num_file
+
+        # بروزرسانی دیتابیس
+        with get_connection() as conn:
+            conn.execute("""
+                         UPDATE items
+                         SET name=?,
+                             price=?,
+                             category=?,
+                             year=?,
+                             author=?,
+                             isbn=?,
+                             num_page=?,
+                             duration=?,
+                             num_file=?
+                         WHERE id = ?
+                         """, (self.name, self.price, self.category, self.year,
+                               getattr(self, "author", None), getattr(self, "isbn", None),
+                               getattr(self, "num_page", None), getattr(self, "duration", None),
+                               getattr(self, "num_file", None), self.id))
+            conn.commit()
+
+        write_log(f"Library Item ===> Item edited (id : {self.id})")
+
+    @staticmethod
+    def _row_to_object(row):
+        _, name, price, category, year, type_, author, isbn, num_page, duration, num_file = row
+
+        if type_ == "Book":
+            obj = Book(name, price, category, year, author, isbn, num_page)
+        elif type_ == "Magazine":
+            obj = Magazine(name, price, category, year, num_page)
+        elif type_ == "DVD":
+            obj = DVD(name, price, category, year, duration, num_file)
+        else:
+            return None
+
+        obj.__id = row[0]
+        return obj
 
 
 class Book(Item):
     def __init__(self, name, price, category, year, author, isbn, num_page):
-        super().__init__(name, price, category, year)
-        self.author = author
-        self.isbn = isbn
-        self.num_page = num_page
-
-    def show(self):
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- Book Info -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        print(f"Book ID: {self.id}")
-        print(f"Book name: {self.name}")
-        print(f"Book price: {self.price}")
-        print(f"Book category: {self.category}")
-        print(f"Book year: {self.year}")
-        print(f"Book Author: {self.author}")
-        print(f"Book ISBN: {self.isbn}")
-        print(f"Book Num Page: {self.num_page}\n")
-        write_log(f"Library Item ===> Book info requested (id : {self.id})")
-
-    def edit(self, n_name=None, n_price=None, n_category=None, n_year=None,
-             n_author=None, n_isbn=None, n_page_num=None):
-        super().edit(n_name=n_name, n_price=n_price, n_category=n_category, n_year=n_year)
-        if n_author is not None:
-            self.author = n_author
-        if n_isbn is not None:
-            self.isbn = n_isbn
-        if n_page_num is not None:
-            self.num_page = n_page_num
-        print("Book edited")
-        write_log(f"Library Item ===> Book edited (id : {self.id})")
+        super().__init__(name, price, category, year, "Book",
+                         author=author, isbn=isbn, num_page=num_page)
 
 
 class Magazine(Item):
     def __init__(self, name, price, category, year, num_page):
-        super().__init__(name, price, category, year)
-        self.num_page = num_page
-
-    def show(self):
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- Magazine Info -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        print(f"Magazine ID: {self.id}")
-        print(f"Magazine Name: {self.name}")
-        print(f"Magazine Price: {self.price}")
-        print(f"Magazine category: {self.category}")
-        print(f"Magazine Num Page: {self.num_page}")
-        print(f"Magazine year: {self.year}\n")
-        write_log(f"Library Item ===> Magazine info requested (id : {self.id})")
-
-    def edit(self, n_name=None, n_price=None, n_category=None, n_year=None,
-             n_page_num=None):
-        super().edit(n_name=n_name, n_price=n_price, n_category=n_category, n_year=n_year)
-        if n_page_num is not None:
-            self.num_page = n_page_num
-        print("Magazine edited")
-        write_log(f"Library Item ===> Magazine edited (id : {self.id})")
+        super().__init__(name, price, category, year, "Magazine",
+                         num_page=num_page)
 
 
 class DVD(Item):
     def __init__(self, name, price, category, year, duration, num_file):
-        super().__init__(name, price, category, year)
-        self.duration = duration
-        self.num_file = num_file
+        super().__init__(name, price, category, year, "DVD",
+                         duration=duration, num_file=num_file)
 
-    def show(self):
-        print("-+-+-+-+-+-+-+-+-+-+-+-+-+- DVD Info -+-+-+-+-+-+-+-+-+-+-+-+-+-")
-        print(f"DVD ID: {self.id}")
-        print(f"DVD Name: {self.name}")
-        print(f"DVD Price: {self.price}")
-        print(f"DVD category: {self.category}")
-        print(f"DVD duration: {self.duration}")
-        print(f"DVD num file: {self.num_file}")
-        print(f"DVD year: {self.year}\n")
-        write_log(f"Library Item ===> DVD info requested (id : {self.id})")
-
-    def edit(self, n_name=None, n_price=None, n_category=None, n_year=None,
-             n_duration=None, n_num_file=None):
-        super().edit(n_name=n_name, n_price=n_price, n_category=n_category, n_year=n_year)
-        if n_duration is not None:
-            self.duration = n_duration
-        if n_num_file is not None:
-            self.num_file = n_num_file
-        print("DVD edited")
-        write_log(f"Library Item ===> DVD edited (id : {self.id})")
-
-
-if __name__ == "__main__":
-
-    print("\n--- Test 1: Create Items ---")
-    b1 = Book("Harry Potter", 150, "Fantasy", 2001, "J.K.Rowling", "123456789", 450)
-    m1 = Magazine("Science Weekly", 50, "Science", 2020, 40)
-    d1 = DVD("Interstellar", 90, "Movie", 2014, 180, 2)
-
-    print("\n--- Test 2: Show Items Individually ---")
-    b1.show()
-    m1.show()
-    d1.show()
-
-    print("\n--- Test 3: Show All Items ---")
-    Item.show_all()
-
-    print("\n--- Test 4: Search by ID ---")
-    Item.search_by_id(b1.id)
-    Item.search_by_id(9999)  # Not found
-
-    print("\n--- Test 5: Edit Item (Base class edit) ---")
-    b1.edit(n_category="Magic", n_page_num=500)
-    b1.show()
-
-    print("\n--- Test 6: Edit Price Using Property ---")
-    b1.edit(n_price=200)
-    print(f"New Price: {b1.price}")
-
-    print("\n--- Test 7: Remove Item ---")
-    d1.remove()
-    Item.show_all()
-
-    print("\n--- Test 8: Count Items ---")
-    Item.Item_count()
-
-    print("\n--- Test 9: Inheritance Check ---")
-    print(isinstance(b1, Item))
-    print(isinstance(m1, Item))
-    print(isinstance(d1, Item))
-    print(isinstance(b1, Book))
-    print(isinstance(b1, Magazine))
 
 
