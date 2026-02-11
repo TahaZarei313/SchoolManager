@@ -45,10 +45,6 @@ school_manager/
 │   ├── Student.py
 │   └── Subject.py
 │
-├── services/
-│   ├── Library_Service.py
-│   └── School_Service.py
-│
 ├── database/
 │   ├── db.py
 │   └── school.db
