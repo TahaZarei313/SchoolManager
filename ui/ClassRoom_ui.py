@@ -1,13 +1,15 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
-from models.ClassRoom import *
+from models.ClassRoom import ClassRoom
 
+
+# ================= ADD =================
 def add_classroom():
     win = tk.Toplevel()
     win.title("Add Class Room")
     win.geometry("400x420")
-    win.grab_set()  # modal
+    win.grab_set()
 
     tk.Label(win, text="Add Class Room", font=("Arial", 16)).pack(pady=10)
 
@@ -17,7 +19,10 @@ def add_classroom():
 
     tk.Label(win, text="Class Grade").pack()
     grade_var = tk.StringVar()
-    combo_grade = ttk.Combobox(win, textvariable=grade_var, values=["7", "8", "9"], state="readonly")
+    combo_grade = ttk.Combobox(
+        win, textvariable=grade_var,
+        values=["7", "8", "9"], state="readonly"
+    )
     combo_grade.pack()
     combo_grade.current(0)
 
@@ -41,6 +46,7 @@ def add_classroom():
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
+# ================= SHOW ALL =================
 def show_all_classrooms():
     win = tk.Toplevel()
     win.title("All Class Rooms")
@@ -52,13 +58,13 @@ def show_all_classrooms():
     listbox = tk.Listbox(win, width=100)
     listbox.pack(fill="both", expand=True, padx=10, pady=10)
 
-    all_classroom = ClassRoom.show_all()
-    for info in all_classroom:
+    for info in ClassRoom.show_all():
         listbox.insert(tk.END, info)
 
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=10)
 
 
+# ================= SEARCH =================
 def search_classroom():
     win = tk.Toplevel()
     win.title("Search Class Room")
@@ -67,6 +73,7 @@ def search_classroom():
 
     tk.Label(win, text="Search Class Room", font=("Arial", 16)).pack(pady=10)
     tk.Label(win, text="Class ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
@@ -75,26 +82,27 @@ def search_classroom():
 
     def search():
         try:
-            student_id = int(entry_id.get())
-            classRoom = ClassRoom.search_by_id(student_id)
-            if classRoom is None:
-                result.configure(text="")
-                messagebox.showerror("Error", "ClassRoom not found", parent=win)
+            cid = int(entry_id.get())
+            classroom = ClassRoom.search_by_id(cid)
+            if classroom is None:
+                messagebox.showerror("Error", "Class Room not found", parent=win)
+                result.config(text="")
             else:
                 result.config(
                     text=
-                    f"ID: {classRoom.class_id}\n"
-                    f"Name: {classRoom.class_name}\n"
-                    f"Grade: {classRoom.class_grade}\n"
-                    f"Capacity: {classRoom.capacity}"
+                    f"ID: {classroom.class_id}\n"
+                    f"Name: {classroom.class_name}\n"
+                    f"Grade: {classroom.class_grade}\n"
+                    f"Capacity: {classroom.capacity}"
                 )
-        except:
+        except ValueError:
             messagebox.showerror("Error", "Invalid ID", parent=win)
 
     tk.Button(win, text="Search", width=25, command=search).pack(pady=5)
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
+# ================= REMOVE =================
 def remove_classroom():
     win = tk.Toplevel()
     win.title("Remove Class Room")
@@ -103,26 +111,28 @@ def remove_classroom():
 
     tk.Label(win, text="Remove Class Room", font=("Arial", 16)).pack(pady=10)
     tk.Label(win, text="Class ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
     def remove():
         try:
             cid = int(entry_id.get())
-            for c in ClassRoom.ClassRoom_list:
-                if c.class_id == cid:
-                    c.remove()
-                    messagebox.showinfo("Success", "Class Room removed", parent=win)
-                    win.destroy()
-                    return
-            messagebox.showerror("Error", "Class Room not found", parent=win)
-        except:
+            classroom = ClassRoom.search_by_id(cid)
+            if classroom:
+                classroom.remove()
+                messagebox.showinfo("Success", "Class Room removed", parent=win)
+                win.destroy()
+            else:
+                messagebox.showerror("Error", "Class Room not found", parent=win)
+        except ValueError:
             messagebox.showerror("Error", "Invalid ID", parent=win)
 
     tk.Button(win, text="Remove", width=25, command=remove).pack(pady=5)
     tk.Button(win, text="Close", width=25, command=win.destroy).pack(pady=5)
 
 
+# ================= EDIT =================
 def edit_classroom():
     win = tk.Toplevel()
     win.title("Edit Class Room")
@@ -131,17 +141,14 @@ def edit_classroom():
 
     tk.Label(win, text="Edit Class Room", font=("Arial", 16)).pack(pady=10)
     tk.Label(win, text="Class ID").pack()
+
     entry_id = tk.Entry(win)
     entry_id.pack()
 
     def search_and_edit():
         try:
             cid = int(entry_id.get())
-            classroom = None
-            for c in ClassRoom.ClassRoom_list:
-                if c.class_id == cid:
-                    classroom = c
-                    break
+            classroom = ClassRoom.search_by_id(cid)
             if classroom is None:
                 messagebox.showerror("Error", "Class Room not found", parent=win)
                 return
@@ -160,7 +167,10 @@ def edit_classroom():
 
             tk.Label(win.form, text="Class Grade").pack()
             grade_var = tk.StringVar(value=str(classroom.class_grade))
-            combo_grade = ttk.Combobox(win.form, textvariable=grade_var, values=["7", "8", "9"], state="readonly")
+            combo_grade = ttk.Combobox(
+                win.form, textvariable=grade_var,
+                values=["7", "8", "9"], state="readonly"
+            )
             combo_grade.pack()
 
             tk.Label(win.form, text="Capacity").pack()
@@ -171,7 +181,7 @@ def edit_classroom():
             def save_edit():
                 try:
                     classroom.edit(
-                        class_name=entry_name.get() or None,
+                        class_name=entry_name.get(),
                         n_class_grade=int(grade_var.get()),
                         n_capacity=int(entry_capacity.get())
                     )
